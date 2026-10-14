@@ -42,27 +42,51 @@ export const ROLE_NAMES = {
   protein: '优质蛋白', carb: '主食', veg: '蔬菜', fat: '油脂坚果', dairy: '奶 · 豆奶', fruit: '水果',
 };
 
-// 菜单模板：按日期轮换
+// 忌口 / 饮食偏好：选中后推荐时避开这些食材
+export const PREF_GROUPS = {
+  seafood: { name: '不吃海鲜', foods: ['shrimp', 'salmon', 'cod'] },
+  beef: { name: '不吃牛肉', foods: ['beef'] },
+  pork: { name: '不吃猪肉', foods: ['pork'] },
+  vegetarian: { name: '素食', foods: ['chicken', 'beef', 'pork', 'duck', 'shrimp', 'salmon', 'cod'] },
+  dairy: { name: '不喝牛奶', foods: ['milk', 'yogurt'] },
+  egg: { name: '不吃鸡蛋', foods: ['egg'] },
+};
+
+// 菜单库：推荐时按忌口过滤，再按蛋白质缺口排序
 export const MENUS = {
   breakfast: [
     { name: '全麦吐司 · 水煮蛋 · 牛奶', foods: ['wholewheat', 'egg', 'milk'] },
     { name: '燕麦酸奶杯 · 蓝莓', foods: ['oats', 'yogurt', 'blueberry'] },
     { name: '蒸玉米 · 鸡蛋 · 无糖豆浆', foods: ['corn', 'egg', 'soymilk'] },
+    { name: '红薯 · 鸡蛋 · 苹果', foods: ['sweetpotato', 'egg', 'apple'] },
+    { name: '全麦鸡胸三明治 · 生菜番茄', foods: ['wholewheat', 'chicken', 'lettuce', 'tomato'] },
+    { name: '燕麦豆浆 · 香蕉 · 巴旦木', foods: ['oats', 'soymilk', 'banana', 'almond'] },
+    { name: '牛油果吐司 · 水煮蛋', foods: ['wholewheat', 'avocado', 'egg'] },
   ],
   lunch: [
     { name: '糙米饭 · 黑椒鸡胸 · 蒜蓉西兰花', foods: ['brownrice', 'chicken', 'broccoli', 'olive'] },
     { name: '荞麦面 · 番茄牛里脊 · 上海青', foods: ['buckwheat', 'beef', 'tomato', 'bokchoy'] },
     { name: '藜麦饭 · 香煎三文鱼 · 芦笋', foods: ['quinoa', 'salmon', 'asparagus'] },
+    { name: '米饭 · 青椒里脊 · 清炒菠菜', foods: ['rice', 'pork', 'spinach', 'olive'] },
+    { name: '糙米饭 · 卤鸭腿 · 香菇青菜', foods: ['brownrice', 'duck', 'mushroom', 'bokchoy'] },
+    { name: '藜麦鸡胸沙拉 · 牛油果', foods: ['quinoa', 'chicken', 'lettuce', 'cucumber', 'avocado'] },
+    { name: '米饭 · 麻婆豆腐 · 蒜蓉西兰花', foods: ['rice', 'tofu', 'broccoli'] },
   ],
   dinner: [
     { name: '蒸红薯 · 白灼虾仁 · 清炒菠菜', foods: ['sweetpotato', 'shrimp', 'spinach', 'olive'] },
     { name: '土豆 · 清蒸鳕鱼 · 香菇青菜', foods: ['potato', 'cod', 'mushroom', 'bokchoy'] },
     { name: '小份米饭 · 家常豆腐 · 凉拌黄瓜', foods: ['rice', 'tofu', 'cucumber'] },
+    { name: '玉米 · 番茄炒蛋 · 生菜', foods: ['corn', 'egg', 'tomato', 'lettuce'] },
+    { name: '荞麦面 · 鸡胸肉 · 芦笋', foods: ['buckwheat', 'chicken', 'asparagus', 'olive'] },
+    { name: '红薯 · 黑椒牛柳 · 西兰花', foods: ['sweetpotato', 'beef', 'broccoli'] },
+    { name: '豆腐番茄汤 · 小份糙米 · 上海青', foods: ['tofu', 'tomato', 'brownrice', 'bokchoy'] },
   ],
   snack: [
     { name: '无糖酸奶 · 巴旦木', foods: ['yogurt', 'almond'] },
     { name: '苹果 · 低脂牛奶', foods: ['apple', 'milk'] },
     { name: '香蕉 · 无糖豆浆', foods: ['banana', 'soymilk'] },
+    { name: '水煮蛋 · 黄瓜', foods: ['egg', 'cucumber'] },
+    { name: '蓝莓 · 无糖酸奶', foods: ['blueberry', 'yogurt'] },
   ],
 };
 

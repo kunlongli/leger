@@ -12,38 +12,30 @@ const ADAPTIVE_MIN_DAYS = 10;
 const DAY_MS = 86400000;
 
 export const TIERS = [
-  { id: 'gentle', name: '温和', deficit: 300, desc: '几乎无感，适合刚起步或工作高压期' },
-  { id: 'standard', name: '标准', deficit: 500, desc: '每周约 0.45kg，最推荐的长期节奏' },
-  { id: 'active', name: '进阶', deficit: 750, desc: '需要稳定运动配合，适合执行力强的阶段' },
-  { id: 'hard', name: '困难模式', deficit: 1000, desc: '短期冲刺，摄入可低于基础代谢，建议不超过 4 周' },
+  { id: 'gentle', name: '温和', desc: '几乎无感，适合刚起步或工作高压期' },
+  { id: 'standard', name: '标准', desc: '最推荐的长期节奏' },
+  { id: 'active', name: '进阶', desc: '需要稳定运动配合，适合执行力强的阶段' },
+  { id: 'hard', name: '困难模式', desc: '短期冲刺，摄入可低于基础代谢，建议不超过 4 周' },
 ];
 
+export const MEAL_NAMES = { breakfast: '早餐', lunch: '午餐', snack: '加餐', dinner: '晚餐' };
+
 export const FASTING = {
-  none: {
-    name: '常规三餐',
-    meals: [
-      { key: 'breakfast', name: '早餐', share: 0.3, time: '07:30' },
-      { key: 'lunch', name: '午餐', share: 0.4, time: '12:00' },
-      { key: 'dinner', name: '晚餐', share: 0.3, time: '18:30' },
-    ],
+  none: { name: '常规三餐', meals: [['breakfast', '07:30'], ['lunch', '12:00'], ['dinner', '18:30']] },
+  '16:8': { name: '轻断食 16:8', window: '12:00 – 20:00', meals: [['lunch', '12:00'], ['snack', '16:00'], ['dinner', '19:30']] },
+  '5:2': { name: '轻断食 5:2', meals: [['breakfast', '07:30'], ['lunch', '12:00'], ['dinner', '18:30']] },
+};
+
+// 可在「方案 · 高级参数」中调整的参数
+export const DEFAULT_SETTINGS = {
+  deficits: { gentle: 300, standard: 500, active: 750, hard: 1000 },
+  mealShares: {
+    none: { breakfast: 30, lunch: 40, dinner: 30 },
+    '16:8': { lunch: 45, snack: 15, dinner: 40 },
+    '5:2': { breakfast: 30, lunch: 40, dinner: 30 },
   },
-  '16:8': {
-    name: '轻断食 16:8',
-    window: '12:00 – 20:00',
-    meals: [
-      { key: 'lunch', name: '午餐', share: 0.45, time: '12:00' },
-      { key: 'snack', name: '加餐', share: 0.15, time: '16:00' },
-      { key: 'dinner', name: '晚餐', share: 0.4, time: '19:30' },
-    ],
-  },
-  '5:2': {
-    name: '轻断食 5:2',
-    meals: [
-      { key: 'breakfast', name: '早餐', share: 0.3, time: '07:30' },
-      { key: 'lunch', name: '午餐', share: 0.4, time: '12:00' },
-      { key: 'dinner', name: '晚餐', share: 0.3, time: '18:30' },
-    ],
-  },
+  proteinPerKg: { normal: 1.4, keepMuscle: 1.8 },
+  fatPct: 27,
 };
 
 const sum = (a) => a.reduce((s, x) => s + x, 0);
@@ -146,16 +138,17 @@ export function metabolism(profile, logs) {
   };
 }
 
-function macros(intake, weight, target, keepMuscle) {
+function macros(intake, weight, target, keepMuscle, settings) {
   const proteinBase = Math.min(weight, target + 10);
-  const protein = Math.round(proteinBase * (keepMuscle ? 1.8 : 1.4));
-  const fat = Math.round((intake * 0.27) / 9);
+  const protein = Math.round(proteinBase * settings.proteinPerKg[keepMuscle ? 'keepMuscle' : 'normal']);
+  const fat = Math.round((intake * settings.fatPct) / 100 / 9);
   const carbs = Math.max(0, Math.round((intake - protein * 4 - fat * 9) / 4));
   return { protein, fat, carbs };
 }
 
-export function plan(profile, meta) {
-  const tier = TIERS.find((t) => t.id === profile.tier) ?? TIERS[1];
+export function plan(profile, meta, settings = DEFAULT_SETTINGS) {
+  const base = TIERS.find((t) => t.id === profile.tier) ?? TIERS[1];
+  const tier = { ...base, deficit: settings.deficits[base.id] };
   const minIntake = MIN_INTAKE[profile.sex];
   const floor = tier.id === 'hard'
     ? Math.max(minIntake, meta.bmr * HARD_FLOOR_RATIO)
@@ -175,13 +168,16 @@ export function plan(profile, meta) {
     extraSteps,
     weeklyLossKg: (tier.deficit * 7) / KCAL_PER_KG,
     belowBmr: intake < meta.bmr,
-    macros: macros(intake, meta.weight, profile.target, profile.keepMuscle),
+    macros: macros(intake, meta.weight, profile.target, profile.keepMuscle, settings),
     fastDay,
   };
 }
 
-export function mealTargets(intake, fasting) {
-  return FASTING[fasting].meals.map((m) => ({ ...m, kcal: Math.round(intake * m.share) }));
+export function mealTargets(intake, fasting, settings = DEFAULT_SETTINGS) {
+  const shares = settings.mealShares[fasting];
+  return FASTING[fasting].meals.map(([key, time]) => ({
+    key, time, name: MEAL_NAMES[key], share: shares[key] / 100, kcal: Math.round((intake * shares[key]) / 100),
+  }));
 }
 
 const ROLE_SHARE = { protein: 0.4, carb: 0.4, veg: 0.1, fat: 0.1, dairy: 0.25, fruit: 0.1 };
