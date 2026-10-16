@@ -1,9 +1,9 @@
 // 阶段判断 + 建议：规则表，按优先级取第一个命中的阶段
 import { sortByDate, weightTrend, sleepHours, latestWeight, dayNum } from './calc.js';
+import { GUIDE, MAX_WEEKLY_LOSS_KG } from './guide.js';
 
-const FAST_LOSS_PCT = 0.01; // 每周掉体重 >1% 视为过快
 const PLATEAU_KG = 0.3; // 14 天趋势变化 < 0.3kg 视为平台
-const GOOD_SLEEP_H = 7;
+const GOOD_SLEEP_H = GUIDE.sleepHours;
 const WAIST_WINDOW_DAYS = 21;
 const WAIST_MIN_SPAN_DAYS = 7;
 const WAIST_SIGNIFICANT_CM = 1;
@@ -23,7 +23,7 @@ function avgSleep(logs) {
   return hs.length ? hs.reduce((s, x) => s + x, 0) / hs.length : null;
 }
 
-function stageOf({ count, remaining, weeklyKg, weeklyPct, change14, isLosing }) {
+function stageOf({ count, remaining, weeklyKg, change14, isLosing }) {
   if (count < 5) return {
     key: 'start', name: '起步期',
     summary: '先连续记录一周晨重与睡前体重，系统会逐步校准你的真实代谢。',
@@ -32,9 +32,9 @@ function stageOf({ count, remaining, weeklyKg, weeklyPct, change14, isLosing }) 
     key: 'maintain', name: '维持期',
     summary: '已到达目标。把摄入回调到维持热量（TDEE），继续力量训练巩固成果。',
   };
-  if (weeklyPct < -FAST_LOSS_PCT) return {
+  if (weeklyKg < -MAX_WEEKLY_LOSS_KG) return {
     key: 'fast', name: '下降过快',
-    summary: `近期每周下降约 ${Math.abs(weeklyKg).toFixed(2)}kg，超过体重的 1%，肌肉流失风险上升。`,
+    summary: `近期每周下降约 ${Math.abs(weeklyKg).toFixed(2)}kg，超过指南建议的每月 2–4kg，肌肉流失风险上升。`,
   };
   if (weeklyKg > 0.1) return {
     key: 'rebound', name: '反弹预警',
@@ -75,7 +75,6 @@ export function analyze(profile, logs, meta) {
     count: weighed.length,
     remaining: weight - profile.target,
     weeklyKg,
-    weeklyPct: weeklyKg / weight,
     change14: trend * 14,
     isLosing: weeklyKg < -0.1,
   };
@@ -84,7 +83,7 @@ export function analyze(profile, logs, meta) {
 
   const sleep = avgSleep(sorted);
   if (sleep != null && sleep < GOOD_SLEEP_H) {
-    tips.push(`近 7 天平均睡眠 ${sleep.toFixed(1)}h，低于 7h。睡眠不足会降低夜间消耗、推高饥饿感，建议提前 30 分钟上床。`);
+    tips.push(`近 7 天平均睡眠 ${sleep.toFixed(1)}h，低于指南建议的 7 小时左右。睡眠不足会推高饥饿感、扰乱代谢，建议提前 30 分钟上床。`);
   }
   const ratio = meta.night.ratio;
   if (ratio != null && ratio < 0.85) tips.push('近 3 晚睡眠掉秤明显少于你的基线：可能是晚餐偏咸、饮水不足或压力大，代谢有放缓迹象。');

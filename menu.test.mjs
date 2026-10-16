@@ -117,6 +117,45 @@ const pa = analyze(profile, plateauLogs, metabolism(profile, plateauLogs));
 assert.equal(pa.stage.key, 'plateau');
 assert.ok(pa.tips[0].includes('腰围减少'), pa.tips[0]);
 
+// ---------- 指南对齐 ----------
+const { trainingWeek } = await import('./data.js');
+const { GUIDE } = await import('./guide.js');
+for (const keepMuscle of [true, false]) {
+  const wk = trainingWeek('standard', keepMuscle);
+  assert.ok(wk.cardioMinutes >= GUIDE.cardioMinutes[0] && wk.cardioMinutes <= GUIDE.cardioMinutes[1], '有氧分钟在指南区间');
+  assert.ok(wk.strengthDays >= GUIDE.strengthDays[0] && wk.strengthDays <= GUIDE.strengthDays[1], '抗阻天数在指南区间');
+  const idx = wk.days.map((d, i) => (d.isStrength ? i : -1)).filter((i) => i >= 0);
+  assert.ok(idx.every((d, i) => i === 0 || d - idx[i - 1] >= 2), '抗阻隔天');
+}
+assert.equal(trainingWeek('standard', true).strengthDays, 3);
+assert.equal(trainingWeek('standard', false).strengthDays, 2);
+const weekly = (perDay) => Array.from({ length: 14 }, (_, i) => ({ date: new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10), morningWeight: +(95 + perDay * i).toFixed(2) }));
+const big = { ...profile, target: 70 };
+assert.equal(analyze(big, weekly(-1.1 / 7), metabolism(big, weekly(-1.1 / 7))).stage.key, 'fast', '每周 -1.1kg 过快');
+assert.equal(analyze(big, weekly(-0.9 / 7), metabolism(big, weekly(-0.9 / 7))).stage.key, 'steady', '每周 -0.9kg 在指南内');
+
+// ---------- 周报 ----------
+const { weeklyReport, reportStats } = await import('./report.js');
+const dayIso = (i) => new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10); // 10-01 起
+const rlogs = Array.from({ length: 14 }, (_, i) => ({
+  date: dayIso(i), morningWeight: i < 7 ? 81 : 80, sleepStart: '23:00', wake: i < 7 ? '06:00' : '06:30',
+  intake: i < 7 ? 2000 : [1700, 1750, 1500, 1700, 2100, null, 1690][i - 7], steps: 8000,
+  waist: i === 3 ? 92 : i === 12 ? 90.5 : null,
+}));
+const rep = weeklyReport(rlogs, 1700, { stage: { name: '稳定减脂期' }, tips: ['a', 'b', 'c'] }, '2026-10-14');
+assert.deepEqual([rep.from, rep.to, rep.loggedDays], ['2026-10-08', '2026-10-14', 7]);
+assert.equal(rep.weight, 80);
+assert.equal(rep.weightDelta, -1);
+assert.equal(rep.sleep, 7.5);
+assert.deepEqual([rep.intakeDays, rep.onTarget], [6, 4], '1700/1750/1700/1690 达标，1500 与 2100 超出 ±10%');
+assert.equal(rep.waistDelta, -1.5);
+assert.deepEqual(rep.tips, ['a', 'b']);
+assert.equal(reportStats(rep)[3].label, '腰围变化');
+assert.equal(reportStats(rep)[3].value, '−1.5');
+const empty = weeklyReport([], 1700, { stage: { name: '起步期' }, tips: [] }, '2026-10-14');
+assert.deepEqual([empty.weight, empty.weightDelta, empty.sleep, empty.intakeDays, empty.loggedDays], [null, null, null, 0, 0]);
+assert.equal(reportStats(empty)[0].value, '—');
+
 // ---------- 离线缓存清单 ----------
 const { readFileSync, readdirSync } = await import('node:fs');
 const swText = readFileSync(new URL('./sw.js', import.meta.url), 'utf8');

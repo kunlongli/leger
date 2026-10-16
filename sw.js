@@ -4,7 +4,7 @@
 const CACHE = 'leger-v1';
 const CORE = [
   './', 'index.html', 'style.css', 'fonts/fonts.css', 'manifest.webmanifest',
-  'app.js', 'calc.js', 'advice.js', 'data.js', 'menu.js', 'store.js', 'charts.js', 'ui.js',
+  'app.js', 'calc.js', 'advice.js', 'data.js', 'menu.js', 'store.js', 'charts.js', 'ui.js', 'guide.js', 'report.js',
   'views/core.js', 'views/plan.js', 'views/kitchen.js', 'views/foods.js',
   'icons/favicon-32.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png',
 ];

@@ -2,7 +2,8 @@
 import { FASTING } from '../calc.js';
 import { PREF_GROUPS } from '../data.js';
 import { candidates, recommend, MIN_MEAL_KCAL } from '../menu.js';
-import { esc, kpi, portionList, messages } from '../ui.js';
+import { esc, kpi, portionList, messages, tipsList } from '../ui.js';
+import { MEAL_RULES, SOURCES } from '../guide.js';
 
 const PER_PAGE = 3;
 
@@ -87,5 +88,8 @@ export function viewKitchen({ state, ui, d }) {
     </div>
     ${messages(ui)}
     <div class="grid-3 section">${r.meals.map((m) => (m.eaten ? eatenCard(m) : openCard(d, ui, m))).join('')}</div>
-    ${fastNote}`;
+    ${fastNote}
+    <div class="card section"><div class="eyebrow">指南要点 · ${SOURCES.obesity2024.name}</div>
+      <p class="muted small" style="margin:8px 0 0">上面每份菜单的食材已按推荐的进餐顺序排列。</p>
+      ${tipsList(MEAL_RULES)}</div>`;
 }

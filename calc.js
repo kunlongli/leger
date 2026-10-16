@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS = {
     '16:8': { lunch: 45, snack: 15, dinner: 40 },
     '5:2': { breakfast: 30, lunch: 40, dinner: 30 },
   },
-  proteinPerKg: { normal: 1.4, keepMuscle: 1.8 },
+  proteinPerKg: { normal: 1.2, keepMuscle: 1.8 },
   fatPct: 27,
 };
 

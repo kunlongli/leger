@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, metabolism, plan, mealTargets } from './calc.js';
 import { analyze } from './advice.js';
 import { FOODS } from './data.js';
 import { foodPool, remainingMeals } from './menu.js';
+import { weeklyReport, renderReportImage } from './report.js';
 import {
   loadState, saveState, validateProfile, validateLog, validateState, validateSettings, validateFood, validateEatenMeal,
   upsertLog, syncIntake, sampleState, todayISO, EMPTY_STATE,
@@ -43,11 +44,14 @@ function derive() {
   const pool = foodPool(allFoods, state.prefs);
   const meta = metabolism(state.profile, state.logs);
   const pl = plan(state.profile, meta, state.settings);
-  const meals = mealTargets(pl.fastDay?.normalKcal ?? pl.intake, state.profile.fasting, state.settings);
+  const dailyKcal = pl.fastDay?.normalKcal ?? pl.intake;
+  const meals = mealTargets(dailyKcal, state.profile.fasting, state.settings);
+  const analysis = analyze(state.profile, state.logs, meta);
   return {
     meta,
     plan: pl,
-    analysis: analyze(state.profile, state.logs, meta),
+    analysis,
+    report: weeklyReport(state.logs, dailyKcal, analysis, todayISO()),
     meals,
     remaining: remainingMeals(meals, state.eaten[todayISO()] ?? {}, pl.macros.protein),
     allFoods,
@@ -76,10 +80,7 @@ nav.addEventListener('click', (e) => {
 });
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `leger-${todayISO()}.json` });
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadBlob(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }), `leger-${todayISO()}.json`);
 }
 
 // ---------- 已吃记录 ----------
@@ -104,6 +105,33 @@ function eatSelected(key) {
   const option = meal && selectedOption(d, ui, meal);
   if (!option) return;
   recordMeal(key, { kcal: option.res.total.kcal, protein: option.res.total.protein, name: option.name });
+}
+
+function downloadBlob(blob, name) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// 触屏设备调起系统分享（可直接发微信），电脑或不支持分享时直接下载
+const canShareFiles = (file) => matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] });
+
+async function shareReport() {
+  setUi({ ...CLEAR_MSG, flash: '正在生成分享图…' });
+  try {
+    const blob = await renderReportImage(derive().report);
+    const file = new File([blob], `leger-weekly-${todayISO()}.png`, { type: 'image/png' });
+    if (canShareFiles(file)) {
+      await navigator.share({ files: [file], title: 'LÉGER 本周复盘' });
+      return setUi(CLEAR_MSG);
+    }
+    downloadBlob(blob, file.name);
+    setUi({ ...CLEAR_MSG, flash: '分享图已下载' });
+  } catch (err) {
+    if (err.name === 'AbortError') return setUi(CLEAR_MSG); // 用户关掉了分享面板
+    console.error('[leger] 生成周报失败', err);
+    setUi({ ...CLEAR_MSG, error: '生成分享图失败，请重试' });
+  }
 }
 
 function deleteFood(id) {
@@ -142,6 +170,7 @@ const ACTIONS = {
   'delete-log': ({ date }) => setState({ ...state, logs: state.logs.filter((l) => l.date !== date) }, { ...CLEAR_MSG, flash: `已删除 ${date}` }),
   'load-sample': () => setState(sampleState(), { ...CLEAR_MSG, view: 'today' }),
   export: exportData,
+  'share-report': shareReport,
   clear: () => (ui.confirmClear
     ? setState(EMPTY_STATE, { ...CLEAR_MSG, view: 'profile', picks: [] })
     : setUi({ confirmClear: true })),

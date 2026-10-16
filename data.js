@@ -90,15 +90,18 @@ export const MENUS = {
   ],
 };
 
-// 久坐上班族的保肌训练：徒手 / 弹力带即可，每次 30–40 分钟
+// 运动周计划，依据《成人肥胖食养指南（2024年版）》：以中等强度有氧为主，每周 150–300 分钟；
+// 抗阻每周 2–3 天、隔天进行、每次 10–20 分钟。徒手 / 弹力带即可，适合久坐上班族。
+const STRENGTH_A = { name: '全身抗阻 A', items: ['徒手深蹲 3×12', '俯卧撑（可跪姿）3×8–12', '臀桥 3×15', '平板支撑 3×30s'] };
+const STRENGTH_B = { name: '全身抗阻 B', items: ['后撤箭步蹲 3×10/侧', '弹力带划船 3×12', '哑铃 / 水瓶推举 3×12', '死虫 3×10/侧'] };
 const BASE_WEEK = [
-  { day: '周一', strength: true, focus: '下肢 · 核心', items: ['徒手深蹲 4×12', '后撤箭步蹲 3×10/侧', '臀桥 3×15', '平板支撑 3×40s'] },
-  { day: '周二', strength: true, focus: '上肢 · 推', items: ['俯卧撑（可跪姿）4×8–12', '弹力带推胸 3×12', '哑铃 / 水瓶推举 3×12', '死虫 3×10/侧'] },
-  { day: '周三', focus: '有氧 · 二区', items: ['快走或单车 35 分钟', '心率维持在 (220-年龄)×60–70%'] },
-  { day: '周四', strength: true, focus: '下肢 · 后链', items: ['罗马尼亚硬拉（哑铃/弹力带）4×10', '保加利亚分腿蹲 3×8/侧', '侧桥 3×30s/侧'] },
-  { day: '周五', strength: true, focus: '上肢 · 拉', items: ['弹力带划船 4×12', '反向飞鸟 3×15', '门框引体 / 毛巾划船 3×10', '超人式 3×12'] },
-  { day: '周六', focus: '有氧 · 户外', items: ['快走 / 爬坡 / 游泳 45 分钟'] },
-  { day: '周日', focus: '恢复', items: ['全身拉伸 15 分钟', '泡沫轴放松', '早睡'] },
+  { day: '周一', cardio: 30, cardioName: '快走', strength: STRENGTH_A },
+  { day: '周二', cardio: 40, cardioName: '快走或单车' },
+  { day: '周三', cardio: 30, cardioName: '快走', strength: STRENGTH_B },
+  { day: '周四', cardio: 40, cardioName: '快走或单车' },
+  { day: '周五', cardio: 30, cardioName: '快走', strength: STRENGTH_A, muscleOnly: true },
+  { day: '周六', cardio: 50, cardioName: '户外快走 / 爬坡 / 游泳' },
+  { day: '周日', cardio: 0, rest: ['全身拉伸 15 分钟', '泡沫轴放松', '早睡'] },
 ];
 
 export const DESK_ROUTINE = [
@@ -108,10 +111,22 @@ export const DESK_ROUTINE = [
   '通勤提前一站下车，日常步数打底 6000',
 ];
 
-export function trainingWeek(tierId) {
+// 保肌模式抗阻 3 天，否则 2 天；进阶 / 困难档每个动作加 1 组
+export function trainingWeek(tierId, keepMuscle) {
   const extraSet = tierId === 'active' || tierId === 'hard';
-  return BASE_WEEK.map((d) => ({
-    ...d,
-    items: extraSet && d.strength ? [...d.items, '加组：每个动作 +1 组'] : d.items,
-  }));
+  const days = BASE_WEEK.map((d) => {
+    const strength = d.strength && (keepMuscle || !d.muscleOnly) ? d.strength : null;
+    const items = [
+      ...(d.cardio ? [`${d.cardioName} ${d.cardio} 分钟 · 中等强度（能说话、不能唱歌）`] : []),
+      ...(strength ? [...strength.items, ...(extraSet ? ['加组：每个动作 +1 组'] : [])] : []),
+      ...(d.rest ?? []),
+    ];
+    const focus = [d.cardio && '有氧', strength && `${strength.name} · 约 15–20 分钟`, d.rest && '恢复'].filter(Boolean).join(' + ');
+    return { day: d.day, focus, items, isStrength: Boolean(strength) };
+  });
+  return {
+    days,
+    cardioMinutes: BASE_WEEK.reduce((s, d) => s + d.cardio, 0),
+    strengthDays: days.filter((d) => d.isStrength).length,
+  };
 }

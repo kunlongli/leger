@@ -2,6 +2,7 @@
 import { nightRate, sleepHours, sortByDate, dayNum, movingAverage } from '../calc.js';
 import { todayISO } from '../store.js';
 import { weightChart, nightChart, waistChart } from '../charts.js';
+import { reportStats } from '../report.js';
 import { fmt, longDate, attr, field, select, messages, kpi, bigNum, tipsList, etaText } from '../ui.js';
 
 const ACTIVITY_LABELS = { sedentary: '久坐 · 办公室，几乎不运动', light: '轻度 · 每周运动 1–3 次', moderate: '中度 · 每周运动 3–5 次' };
@@ -89,7 +90,16 @@ export function viewJournal(ctx) {
       <tbody>${rows}</tbody></table>` : '<div class="empty">暂无记录</div>'}</div>`;
 }
 
-export function viewProgress({ state, d }) {
+function weeklySection(ui, r) {
+  return `<div class="section"><div class="eyebrow">Weekly Review · ${r.from.slice(5)} — ${r.to.slice(5)}</div>
+    <h2>本周复盘 <span class="muted small" style="font-family:var(--sans)">记录 ${r.loggedDays}/7 天</span></h2>
+    <div class="kpis">${reportStats(r).map((s) => kpi(s.label, s.value, s.unit, s.note)).join('')}</div>
+    <div class="actions"><button class="btn" data-action="share-report">生成分享图</button>
+      <span class="muted small">生成 1080×1350 竖版卡片，手机上可直接分享到微信</span></div>
+    ${messages(ui)}</div>`;
+}
+
+export function viewProgress({ state, ui, d }) {
   const weighed = sortByDate(state.logs).filter((l) => l.morningWeight);
   const ma = movingAverage(weighed.map((l) => ({ x: dayNum(l.date), y: l.morningWeight })));
   const start = weighed[0]?.morningWeight ?? state.profile.weight;
@@ -98,6 +108,8 @@ export function viewProgress({ state, d }) {
   return `
     <div class="eyebrow">Progress</div><h1>体重管理曲线</h1>
     <p class="lede">${d.analysis.stage.summary}</p>
+    ${weeklySection(ui, d.report)}
+    <div class="section"><div class="eyebrow">Overall</div><h2>总体进度</h2></div>
     <div class="kpis">
       ${kpi('起始', fmt(start, 1), 'kg', weighed[0]?.date ?? '—')}
       ${kpi('当前 · 7日均', fmt(now, 1), 'kg', '日常波动已平滑')}

@@ -20,7 +20,11 @@ export const bigNum = (n, unit) => `<div style="font:300 34px/1.1 var(--serif)">
 export const tipsList = (items) => `<ul class="tips">${items.map((t) => `<li>${t}</li>`).join('')}</ul>`;
 export const chip = (label, on, action, data = '') => `<button class="chip ${on ? 'on' : ''}" data-action="${action}" ${data}>${esc(label)}</button>`;
 
-export const portionList = (res) => `<ul class="portion-list">${res.items.map((i) => `<li><span>${esc(i.name)}</span><span>${i.grams} g <span class="muted">· ${i.kcalOut} kcal</span></span></li>`).join('')}</ul>
+// 按指南进餐顺序展示：蔬菜 → 肉蛋豆奶 → 主食 → 其他
+const EAT_ORDER = { veg: 0, protein: 1, dairy: 2, carb: 3, fat: 4, fruit: 5 };
+const byEatOrder = (items) => [...items].sort((a, b) => EAT_ORDER[a.role] - EAT_ORDER[b.role]);
+
+export const portionList = (res) => `<ul class="portion-list">${byEatOrder(res.items).map((i) => `<li><span>${esc(i.name)}</span><span>${i.grams} g <span class="muted">· ${i.kcalOut} kcal</span></span></li>`).join('')}</ul>
   <p class="muted small">合计 ${res.total.kcal} kcal · 蛋白 ${res.total.protein}g · 碳水 ${res.total.carbs}g · 脂肪 ${res.total.fat}g</p>`;
 
 export function etaText(remaining, weeklyKg) {
