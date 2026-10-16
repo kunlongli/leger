@@ -156,6 +156,43 @@ const empty = weeklyReport([], 1700, { stage: { name: '起步期' }, tips: [] },
 assert.deepEqual([empty.weight, empty.weightDelta, empty.sleep, empty.intakeDays, empty.loggedDays], [null, null, null, 0, 0]);
 assert.equal(reportStats(empty)[0].value, '—');
 
+// ---------- 生理期 ----------
+const { weightTrend, latestWeight } = await import('./calc.js');
+const cycle = Array.from({ length: 14 }, (_, i) => ({
+  date: new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10),
+  morningWeight: i >= 11 ? 81.5 : 80 - i * 0.05, // 最后 3 天水肿 +1.5kg
+  period: i >= 11,
+}));
+assert.ok(weightTrend(cycle) < 0, '排除生理期后趋势仍为下降');
+assert.ok(weightTrend(cycle.map((l) => ({ ...l, period: false }))) > 0, '不排除会被误判为上升');
+assert.equal(latestWeight(profile, cycle), 79.5, '当前体重取最近一个非生理期晨重');
+const ca = analyze({ ...profile, sex: 'female' }, cycle, metabolism(profile, cycle));
+assert.notEqual(ca.stage.key, 'rebound');
+assert.ok(ca.tips[0].includes('生理期'));
+assert.ok(validateLog({ date: D, period: 'on' }).value.period === true, '只标生理期也可保存');
+assert.equal(validateLog({ date: D, morningWeight: 60 }).value.period, false);
+
+// ---------- 备份提醒 ----------
+const { daysSinceBackup } = await import('./store.js');
+assert.equal(daysSinceBackup(EMPTY_STATE, D), null);
+assert.equal(daysSinceBackup({ ...EMPTY_STATE, logs: [{ date: '2026-10-01' }] }, D), 15, '从未备份：从第一条记录算');
+assert.equal(daysSinceBackup({ ...EMPTY_STATE, logs: [{ date: '2026-10-01' }], lastBackup: '2026-10-10' }, D), 6);
+assert.equal(validateState({ logs: [], lastBackup: '2026-10-10' }).value.lastBackup, '2026-10-10');
+assert.equal(validateState({ logs: [], lastBackup: '<x>' }).value.lastBackup, null);
+
+// ---------- 日历提醒 ----------
+const { suggestedTimes, buildIcs } = await import('./reminders.js');
+assert.deepEqual(suggestedTimes([]), { evening: '22:30', morning: '07:30' });
+const nightsLog = [['23:40', '07:00'], ['00:20', '07:20']].map(([sleepStart, wake], i) => ({ date: `2026-10-0${i + 1}`, sleepStart, wake }));
+assert.deepEqual(suggestedTimes(nightsLog), { evening: '23:45', morning: '07:20' }, '跨午夜平均 00:00，提前 15 分钟');
+const ics = buildIcs({ evening: '22:45', morning: '07:20' }, '2026-10-16', new Date('2026-10-16T01:02:03Z'));
+assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n'));
+assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 3);
+assert.ok(ics.includes('DTSTART:20261016T224500') && ics.includes('DTSTART:20261016T072000'));
+assert.ok(ics.includes('DTSTART:20261018T072000') && ics.includes('RRULE:FREQ=WEEKLY;BYDAY=SU'), '腰围提醒从下一个周日开始');
+assert.ok(ics.includes('DTSTAMP:20261016T010203Z'));
+assert.ok(!/[^\r]\n/.test(ics), '行尾必须是 CRLF');
+
 // ---------- 离线缓存清单 ----------
 const { readFileSync, readdirSync } = await import('node:fs');
 const swText = readFileSync(new URL('./sw.js', import.meta.url), 'utf8');

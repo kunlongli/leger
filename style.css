@@ -205,6 +205,11 @@ details.advanced summary::-webkit-details-marker { display: none; }
 details.advanced summary::after { content: '＋'; float: right; color: var(--muted); }
 details.advanced[open] summary::after { content: '－'; }
 
+/* ---------- 提示横幅 ---------- */
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 40px; padding: 16px 20px; border: 1px solid var(--gold); color: var(--ink); font-size: 14px; }
+.banner .btn { padding: 9px 20px; }
+
 /* ---------- 图表 ---------- */
 .chart { width: 100%; height: auto; display: block; }
 .chart text { font: 300 12px var(--sans); fill: var(--muted); }

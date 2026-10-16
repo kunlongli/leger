@@ -50,6 +50,8 @@ const median = (a) => {
 
 export const dayNum = (date) => Math.round(Date.parse(date) / DAY_MS);
 export const sortByDate = (logs) => [...logs].sort((a, b) => a.date.localeCompare(b.date));
+// 生理期前后水分波动大，这些天不参与趋势、代谢校准与当前体重
+export const steady = (logs) => logs.filter((l) => !l.period);
 
 // Katch-McArdle（有体脂率时更准），否则 Mifflin-St Jeor
 export function bmr({ sex, age, height, weight, bodyFat }) {
@@ -75,7 +77,7 @@ export function nightRate(log) {
 
 // 近 3 天夜间掉秤速率 vs 个人基线（此前最多 14 天中位数）
 export function nightIndex(logs) {
-  const rates = sortByDate(logs).map(nightRate).filter((r) => r != null && r > 0);
+  const rates = sortByDate(steady(logs)).map(nightRate).filter((r) => r != null && r > 0);
   if (rates.length < 6) return { factor: 1, recent: null, baseline: null, ratio: null };
   const recent = mean(rates.slice(-3));
   const baseline = median(rates.slice(0, -3).slice(-14));
@@ -93,7 +95,7 @@ function slope(points) {
 }
 
 function recentWeighed(logs, days) {
-  const pts = sortByDate(logs).filter((l) => l.morningWeight);
+  const pts = sortByDate(steady(logs)).filter((l) => l.morningWeight);
   if (!pts.length) return [];
   const last = dayNum(pts.at(-1).date);
   return pts.filter((p) => last - dayNum(p.date) < days);
@@ -117,7 +119,7 @@ export function adaptiveTdee(logs, formulaTdee) {
 }
 
 export function latestWeight(profile, logs) {
-  const last = sortByDate(logs).filter((l) => l.morningWeight).at(-1);
+  const last = sortByDate(steady(logs)).filter((l) => l.morningWeight).at(-1);
   return last ? last.morningWeight : profile.weight;
 }
 

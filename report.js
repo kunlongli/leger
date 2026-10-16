@@ -15,7 +15,7 @@ export function weeklyReport(logs, intakeTarget, analysis, today) {
   });
   const thisWeek = within(0, WEEK);
   const lastWeek = within(WEEK, WEEK * 2);
-  const weightOf = (list) => avg(list.filter((l) => l.morningWeight).map((l) => l.morningWeight));
+  const weightOf = (list) => avg(list.filter((l) => l.morningWeight && !l.period).map((l) => l.morningWeight)); // 生理期不计入周均
   const weight = weightOf(thisWeek);
   const lastWeight = weightOf(lastWeek);
   const latestWaist = (list) => [...list].filter((l) => l.waist).sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.waist ?? null;

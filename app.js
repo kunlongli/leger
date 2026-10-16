@@ -4,6 +4,7 @@ import { analyze } from './advice.js';
 import { FOODS } from './data.js';
 import { foodPool, remainingMeals } from './menu.js';
 import { weeklyReport, renderReportImage } from './report.js';
+import { buildIcs } from './reminders.js';
 import {
   loadState, saveState, validateProfile, validateLog, validateState, validateSettings, validateFood, validateEatenMeal,
   upsertLog, syncIntake, sampleState, todayISO, EMPTY_STATE,
@@ -80,7 +81,9 @@ nav.addEventListener('click', (e) => {
 });
 
 function exportData() {
-  downloadBlob(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }), `leger-${todayISO()}.json`);
+  const next = { ...state, lastBackup: todayISO() };
+  downloadBlob(new Blob([JSON.stringify(next, null, 2)], { type: 'application/json' }), `leger-${todayISO()}.json`);
+  setState(next, { ...CLEAR_MSG, flash: '备份已导出，请保存到网盘或发给自己' });
 }
 
 // ---------- 已吃记录 ----------
@@ -202,6 +205,12 @@ const FORMS = {
     const { value, error } = validateSettings(nest(raw));
     if (error) return setUi({ ...CLEAR_MSG, error });
     setState({ ...state, settings: value }, { ...CLEAR_MSG, flash: '参数已保存，方案已重新计算' });
+  },
+  'reminder-form': (raw) => {
+    const times = { evening: raw.evening, morning: raw.morning };
+    if (!/^\d{2}:\d{2}$/.test(times.evening ?? '') || !/^\d{2}:\d{2}$/.test(times.morning ?? '')) return setUi({ ...CLEAR_MSG, error: '请填写提醒时间' });
+    downloadBlob(new Blob([buildIcs(times, todayISO())], { type: 'text/calendar' }), 'leger-reminders.ics');
+    setUi({ ...CLEAR_MSG, flash: '日历文件已生成，请在弹出的窗口中添加到日历' });
   },
   'food-form': (raw) => {
     const { value, error } = validateFood(raw);

@@ -1,0 +1,13 @@
+{
+  "name": "leger",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node calc.test.mjs && node menu.test.mjs",
+    "test:e2e": "node tests/e2e.mjs",
+    "fonts": "node tools/build-fonts.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}

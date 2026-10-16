@@ -97,6 +97,10 @@ export function analyze(profile, logs, meta) {
   if (waist != null && waist >= WAIST_SIGNIFICANT_CM && facts.isLosing) {
     tips.push(`体重在降，腰围却增加了 ${waist}cm：先确认测量位置一致（肚脐水平、呼气末），再检查蛋白质与力量训练是否到位。`);
   }
+  // 放在最后 unshift，保证排第一：生理期体重上升最容易引起焦虑
+  if (sorted.slice(-3).some((l) => l.period)) {
+    tips.unshift('生理期前后体重上升多为水分滞留，不是长胖。这几天的数据已排除在趋势与代谢校准之外，饮食照常执行即可。');
+  }
   if (!profile.keepMuscle && facts.count >= 5) tips.push('建议开启「保持肌肉量」：每周 3 次力量训练能让掉的更多是脂肪。');
 
   return { stage, tips, facts, sleep, waist };

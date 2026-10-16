@@ -1,9 +1,17 @@
 // 今日 / 记录 / 曲线 / 档案
 import { nightRate, sleepHours, sortByDate, dayNum, movingAverage } from '../calc.js';
-import { todayISO } from '../store.js';
+import { todayISO, daysSinceBackup } from '../store.js';
+import { suggestedTimes } from '../reminders.js';
 import { weightChart, nightChart, waistChart } from '../charts.js';
 import { reportStats } from '../report.js';
 import { fmt, longDate, attr, field, select, messages, kpi, bigNum, tipsList, etaText } from '../ui.js';
+
+const BACKUP_REMIND_DAYS = 14;
+
+const periodField = (state, l) => (state.profile?.sex === 'female'
+  ? `<div class="field"><label>生理期</label><label class="toggle" style="padding:8px 0"><input type="checkbox" name="period" ${l.period ? 'checked' : ''}> 今天在生理期</label>
+      <span class="hint">勾选后当天体重不参与趋势判断</span></div>`
+  : '');
 
 const ACTIVITY_LABELS = { sedentary: '久坐 · 办公室，几乎不运动', light: '轻度 · 每周运动 1–3 次', moderate: '中度 · 每周运动 3–5 次' };
 
@@ -19,6 +27,7 @@ function logForm({ state, ui }) {
     ${field('intake', '当日实际摄入 KCAL', `type="number" inputmode="numeric" ${attr(l.intake)}`, '可选，在「膳食」页记录已吃会自动同步')}
     ${field('steps', '当日步数', `type="number" inputmode="numeric" ${attr(l.steps)}`, '可选')}
     ${field('waist', '腰围 CM', `type="number" step="0.1" inputmode="decimal" ${attr(l.waist)}`, '可选，每周量一次：肚脐水平、呼气末')}
+    ${periodField(state, l)}
   </form>
   <div class="actions"><button class="btn" form="log-form">保存记录</button></div>
   ${messages(ui)}`;
@@ -46,6 +55,13 @@ export const stageCard = (analysis, label) => `<div class="card dark"><div class
   <div style="margin:14px 0 6px"><span class="stage-tag">${analysis.stage.name}</span></div>
   ${tipsList(analysis.tips)}</div>`;
 
+function backupBanner(state) {
+  const days = daysSinceBackup(state, todayISO());
+  if (days == null || days < BACKUP_REMIND_DAYS) return '';
+  return `<div class="banner"><span>${state.lastBackup ? `已经 ${days} 天没有备份` : '还没有备份过数据'}。数据只存在这个浏览器里，清理缓存或换手机都会丢失。</span>
+    <button class="btn ghost" data-action="export">立即导出备份</button></div>`;
+}
+
 export function viewToday(ctx) {
   const { state, d } = ctx;
   const { meta, plan: pl, analysis } = d;
@@ -53,6 +69,7 @@ export function viewToday(ctx) {
   const greet = hour < 11 ? '早安' : hour < 18 ? '午安' : '晚安';
   const remaining = meta.weight - state.profile.target;
   return `
+    ${backupBanner(state)}
     <div class="eyebrow">${longDate()}</div>
     <h1>${greet}，今日代谢已更新</h1>
     <p class="lede">${analysis.stage.summary}</p>
@@ -74,7 +91,7 @@ export function viewJournal(ctx) {
   const rows = sortByDate(ctx.state.logs).reverse().map((l) => {
     const rate = nightRate(l);
     return `<tr>
-      <td>${l.date}</td><td class="num">${fmt(l.eveningWeight, 1)}</td><td class="num">${fmt(l.morningWeight, 1)}</td>
+      <td>${l.date}${l.period ? ' <span class="warn small" title="生理期">经</span>' : ''}</td><td class="num">${fmt(l.eveningWeight, 1)}</td><td class="num">${fmt(l.morningWeight, 1)}</td>
       <td class="num">${l.sleepStart ? fmt(sleepHours(l.sleepStart, l.wake), 1) : '—'}</td>
       <td class="num">${rate != null ? Math.round((l.eveningWeight - l.morningWeight) * 1000) : '—'}</td>
       <td class="num">${fmt(rate)}</td><td class="num">${fmt(l.intake)}</td><td class="num">${fmt(l.steps)}</td><td class="num">${fmt(l.waist, 1)}</td>
@@ -129,6 +146,19 @@ export function viewProgress({ state, ui, d }) {
     </div>`;
 }
 
+function reminderSection(state) {
+  const t = suggestedTimes(state.logs);
+  return `<hr class="rule">
+    <div class="eyebrow">Reminders</div><h2>称重提醒</h2>
+    <p class="muted small">生成日历文件并添加到手机日历，系统日历会按时提醒：每天睡前、晨起称重，每周日量腰围。时间已按你近两周的作息推荐，可以修改。</p>
+    <form id="reminder-form" class="form">
+      ${field('evening', '睡前称重', `type="time" required ${attr(t.evening)}`)}
+      ${field('morning', '晨起称重', `type="time" required ${attr(t.morning)}`)}
+    </form>
+    <div class="actions"><button class="btn" form="reminder-form">添加到日历</button></div>
+    <p class="muted small">iPhone：下载后点「添加全部」；如果在桌面版里没有反应，请用 Safari 打开网站再点一次。安卓：用日历应用打开下载的文件。修改时间后重新添加，会覆盖原来的提醒。</p>`;
+}
+
 export function viewProfile({ state, ui }) {
   const p = state.profile ?? { sex: 'female', activity: 'sedentary' };
   const welcome = !state.profile;
@@ -148,9 +178,10 @@ export function viewProfile({ state, ui }) {
     <div class="actions"><button class="btn" form="profile-form">${welcome ? '开始' : '保存档案'}</button>
       ${welcome ? '<button class="btn ghost" data-action="load-sample">加载演示数据</button>' : ''}</div>
     ${messages(ui)}
+    ${state.profile ? reminderSection(state) : ''}
     <hr class="rule">
     <div class="eyebrow">Data</div><h2>数据</h2>
-    <p class="muted small">数据只保存在当前浏览器。换设备前请先导出。</p>
+    <p class="muted small">数据只保存在当前浏览器，换设备或清理缓存前请先导出。上次备份：${state.lastBackup ?? '从未'}。</p>
     <div class="actions">
       <button class="btn ghost" data-action="export">导出 JSON</button>
       <label class="btn ghost">导入 JSON<input type="file" id="import-file" accept="application/json" hidden></label>

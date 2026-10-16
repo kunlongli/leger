@@ -37,9 +37,10 @@ function xLabels(x0, x1, sx) {
 }
 
 export function weightChart(logs, target, weeklyLossKg) {
-  const pts = sortByDate(logs).filter((l) => l.morningWeight).map((l) => ({ x: dayNum(l.date), y: l.morningWeight }));
+  const pts = sortByDate(logs).filter((l) => l.morningWeight).map((l) => ({ x: dayNum(l.date), y: l.morningWeight, period: l.period }));
   if (pts.length < 2) return '<div class="empty">至少需要两天的晨起体重才能绘制曲线</div>';
-  const ma = movingAverage(pts);
+  const steadyPts = pts.filter((p) => !p.period);
+  const ma = movingAverage(steadyPts.length >= 2 ? steadyPts : pts); // 均线不含生理期
   const proj = projection(ma.at(-1), target, weeklyLossKg);
   const xs = [...pts, ...proj].map((p) => p.x);
   const ys = [...pts.map((p) => p.y), target];
@@ -48,7 +49,7 @@ export function weightChart(logs, target, weeklyLossKg) {
   const sx = scale(x0, x1, PAD.l, W - PAD.r);
   const sy = scale(y0, y1, H - PAD.b, PAD.t);
   const ty = sy(target).toFixed(1);
-  const dots = pts.map((p) => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="2.6" style="fill:var(--muted);opacity:.55"><title>${label(p.x)}  ${p.y}kg</title></circle>`).join('');
+  const dots = pts.map((p) => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="${p.period ? 3.4 : 2.6}" style="fill:var(${p.period ? '--rose' : '--muted'});opacity:${p.period ? 0.85 : 0.55}"><title>${label(p.x)}  ${p.y}kg${p.period ? '（生理期，不计入均线）' : ''}</title></circle>`).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="体重曲线">
     ${yGrid(y0, y1, sy)}${xLabels(x0, x1, sx)}
     <line x1="${PAD.l}" x2="${W - PAD.r}" y1="${ty}" y2="${ty}" style="stroke:var(--gold);stroke-dasharray:2 5;stroke-width:1.2"/>

@@ -84,8 +84,9 @@ function buildLog(raw) {
     intake: num(raw.intake, 'intake', false),
     steps: num(raw.steps, 'steps', false),
     waist: num(raw.waist, 'waist', false),
+    period: raw.period === true || raw.period === 'on',
   };
-  if (!log.morningWeight && !log.eveningWeight && !log.waist && !log.intake) throw new ValidationError('至少填写体重、腰围或摄入中的一项');
+  if (!log.morningWeight && !log.eveningWeight && !log.waist && !log.intake && !log.period) throw new ValidationError('至少填写体重、腰围、摄入中的一项');
   if (!log.sleepStart !== !log.wake) throw new ValidationError('入睡与起床时间需同时填写');
   if (log.morningWeight && log.eveningWeight) {
     const loss = log.eveningWeight - log.morningWeight;
@@ -181,7 +182,7 @@ export const validateFood = safely(buildFood);
 export const validateEatenMeal = safely(buildEatenMeal);
 
 export const DEFAULT_PREFS = { groups: [], exclude: [], pantry: [] };
-export const EMPTY_STATE = { profile: null, logs: [], settings: DEFAULT_SETTINGS, customFoods: [], prefs: DEFAULT_PREFS, eaten: {} };
+export const EMPTY_STATE = { profile: null, logs: [], settings: DEFAULT_SETTINGS, customFoods: [], prefs: DEFAULT_PREFS, eaten: {}, lastBackup: null };
 
 // 旧版本数据缺少的字段自动补默认值
 function buildState(raw) {
@@ -193,6 +194,7 @@ function buildState(raw) {
     customFoods: (raw.customFoods ?? []).map(buildFood),
     prefs: buildPrefs(raw.prefs),
     eaten: buildEaten(raw.eaten),
+    lastBackup: DATE_RE.test(raw.lastBackup ?? '') ? raw.lastBackup : null,
   };
 }
 export const validateState = safely(buildState);
@@ -222,10 +224,17 @@ export function saveState(state) {
 
 export const upsertLog = (logs, log) => [...logs.filter((l) => l.date !== log.date), log];
 
-const EMPTY_LOG = { eveningWeight: null, morningWeight: null, sleepStart: null, wake: null, intake: null, steps: null, waist: null };
-const isEmptyLog = (l) => !l.morningWeight && !l.eveningWeight && !l.waist && !l.intake;
+const EMPTY_LOG = { eveningWeight: null, morningWeight: null, sleepStart: null, wake: null, intake: null, steps: null, waist: null, period: false };
+const isEmptyLog = (l) => !l.morningWeight && !l.eveningWeight && !l.waist && !l.intake && !l.period;
 
 // 膳食页记录的已吃热量 → 当日记录的摄入（覆盖手填值）；当天什么都没有了就删掉这条记录
+// 距上次备份（从未备份则从第一条记录算起）的天数；没有记录时为 null
+export function daysSinceBackup(state, today) {
+  const since = state.lastBackup ?? [...state.logs].map((l) => l.date).sort()[0];
+  if (!since) return null;
+  return Math.round((Date.parse(today) - Date.parse(since)) / 86400000);
+}
+
 export function syncIntake(state, date) {
   const total = Object.values(state.eaten[date] ?? {}).reduce((s, m) => s + m.kcal, 0);
   const existing = state.logs.find((l) => l.date === date);
