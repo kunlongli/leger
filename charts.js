@@ -90,3 +90,18 @@ export function nightChart(logs, baseline) {
   }).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="夜间代谢掉秤">${grid}${bars}${baseLine}</svg>`;
 }
+
+export function waistChart(logs) {
+  const pts = sortByDate(logs).filter((l) => l.waist).map((l) => ({ x: dayNum(l.date), y: l.waist }));
+  if (pts.length < 2) return '<div class="empty">每周量一次腰围（肚脐水平、呼气末），记录两次后显示趋势</div>';
+  const [x0, x1] = [pts[0].x, pts.at(-1).x];
+  const ys = pts.map((p) => p.y);
+  const [y0, y1] = [Math.floor(Math.min(...ys) - 1), Math.ceil(Math.max(...ys) + 1)];
+  const sx = scale(x0, x1, PAD.l, W - PAD.r);
+  const sy = scale(y0, y1, H - PAD.b, PAD.t);
+  const dots = pts.map((p) => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="3.5" style="fill:var(--surface);stroke:var(--gold);stroke-width:1.5"><title>${label(p.x)}  ${p.y}cm</title></circle>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="腰围曲线">
+    ${yGrid(y0, y1, sy)}${xLabels(x0, x1, sx)}
+    <path d="${path(pts, sx, sy)}" style="fill:none;stroke:var(--gold);stroke-width:1.6"/>${dots}
+  </svg>`;
+}

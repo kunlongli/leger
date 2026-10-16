@@ -1,9 +1,22 @@
 // 阶段判断 + 建议：规则表，按优先级取第一个命中的阶段
-import { sortByDate, weightTrend, sleepHours, latestWeight } from './calc.js';
+import { sortByDate, weightTrend, sleepHours, latestWeight, dayNum } from './calc.js';
 
 const FAST_LOSS_PCT = 0.01; // 每周掉体重 >1% 视为过快
 const PLATEAU_KG = 0.3; // 14 天趋势变化 < 0.3kg 视为平台
 const GOOD_SLEEP_H = 7;
+const WAIST_WINDOW_DAYS = 21;
+const WAIST_MIN_SPAN_DAYS = 7;
+const WAIST_SIGNIFICANT_CM = 1;
+
+// 近 3 周腰围变化（cm），两次测量需相隔至少 7 天，否则返回 null
+export function waistChange(logs) {
+  const pts = sortByDate(logs).filter((l) => l.waist);
+  if (pts.length < 2) return null;
+  const last = pts.at(-1);
+  const first = pts.find((p) => dayNum(last.date) - dayNum(p.date) <= WAIST_WINDOW_DAYS);
+  if (dayNum(last.date) - dayNum(first.date) < WAIST_MIN_SPAN_DAYS) return null;
+  return +(last.waist - first.waist).toFixed(1);
+}
 
 function avgSleep(logs) {
   const hs = logs.filter((l) => l.sleepStart && l.wake).slice(-7).map((l) => sleepHours(l.sleepStart, l.wake));
@@ -76,7 +89,16 @@ export function analyze(profile, logs, meta) {
   const ratio = meta.night.ratio;
   if (ratio != null && ratio < 0.85) tips.push('近 3 晚睡眠掉秤明显少于你的基线：可能是晚餐偏咸、饮水不足或压力大，代谢有放缓迹象。');
   if (ratio != null && ratio > 1.15) tips.push('近 3 晚睡眠掉秤高于基线，代谢活跃。注意晚间补水，避免把脱水误判为减脂。');
+  const waist = waistChange(sorted);
+  if (waist != null && waist <= -WAIST_SIGNIFICANT_CM) {
+    tips.unshift(stage.key === 'plateau'
+      ? `体重停滞，但近 3 周腰围减少了 ${Math.abs(waist)}cm：脂肪仍在减少，体重不动多是水分波动，坚持当前方案。`
+      : `近 3 周腰围减少 ${Math.abs(waist)}cm，减脂有效。`);
+  }
+  if (waist != null && waist >= WAIST_SIGNIFICANT_CM && facts.isLosing) {
+    tips.push(`体重在降，腰围却增加了 ${waist}cm：先确认测量位置一致（肚脐水平、呼气末），再检查蛋白质与力量训练是否到位。`);
+  }
   if (!profile.keepMuscle && facts.count >= 5) tips.push('建议开启「保持肌肉量」：每周 3 次力量训练能让掉的更多是脂肪。');
 
-  return { stage, tips, facts, sleep };
+  return { stage, tips, facts, sleep, waist };
 }

@@ -20,6 +20,7 @@ const RANGE = {
   eveningWeight: [30, 250, '睡前体重'],
   intake: [0, 8000, '实际摄入'],
   steps: [0, 80000, '步数'],
+  waist: [40, 200, '腰围'],
 };
 
 class ValidationError extends Error {}
@@ -82,8 +83,9 @@ function buildLog(raw) {
     wake: time(raw.wake, '起床时间'),
     intake: num(raw.intake, 'intake', false),
     steps: num(raw.steps, 'steps', false),
+    waist: num(raw.waist, 'waist', false),
   };
-  if (!log.morningWeight && !log.eveningWeight) throw new ValidationError('至少填写一个体重');
+  if (!log.morningWeight && !log.eveningWeight && !log.waist && !log.intake) throw new ValidationError('至少填写体重、腰围或摄入中的一项');
   if (!log.sleepStart !== !log.wake) throw new ValidationError('入睡与起床时间需同时填写');
   if (log.morningWeight && log.eveningWeight) {
     const loss = log.eveningWeight - log.morningWeight;
@@ -220,6 +222,18 @@ export function saveState(state) {
 
 export const upsertLog = (logs, log) => [...logs.filter((l) => l.date !== log.date), log];
 
+const EMPTY_LOG = { eveningWeight: null, morningWeight: null, sleepStart: null, wake: null, intake: null, steps: null, waist: null };
+const isEmptyLog = (l) => !l.morningWeight && !l.eveningWeight && !l.waist && !l.intake;
+
+// 膳食页记录的已吃热量 → 当日记录的摄入（覆盖手填值）；当天什么都没有了就删掉这条记录
+export function syncIntake(state, date) {
+  const total = Object.values(state.eaten[date] ?? {}).reduce((s, m) => s + m.kcal, 0);
+  const existing = state.logs.find((l) => l.date === date);
+  if (!existing && !total) return state;
+  const log = { ...EMPTY_LOG, ...existing, date, intake: total || null };
+  return { ...state, logs: isEmptyLog(log) ? state.logs.filter((l) => l.date !== date) : upsertLog(state.logs, log) };
+}
+
 const fmtTime = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 
 // 演示数据：35 天，含睡眠与夜间掉秤
@@ -239,6 +253,7 @@ export function sampleState(today = new Date()) {
       wake: fmtTime(Math.round(sleepMin + sleepLen)),
       intake: Math.round(1750 + noise(i, 5) * 300),
       steps: Math.round(6000 + noise(i, 6) * 5000),
+      waist: i % 7 === 0 ? +(94 - i * 0.09).toFixed(1) : null,
     };
   });
   return {

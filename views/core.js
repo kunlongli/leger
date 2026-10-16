@@ -1,7 +1,7 @@
 // 今日 / 记录 / 曲线 / 档案
 import { nightRate, sleepHours, sortByDate, dayNum, movingAverage } from '../calc.js';
 import { todayISO } from '../store.js';
-import { weightChart, nightChart } from '../charts.js';
+import { weightChart, nightChart, waistChart } from '../charts.js';
 import { fmt, longDate, attr, field, select, messages, kpi, bigNum, tipsList, etaText } from '../ui.js';
 
 const ACTIVITY_LABELS = { sedentary: '久坐 · 办公室，几乎不运动', light: '轻度 · 每周运动 1–3 次', moderate: '中度 · 每周运动 3–5 次' };
@@ -15,8 +15,9 @@ function logForm({ state, ui }) {
     ${field('morningWeight', '今晨空腹体重 KG', `type="number" step="0.1" inputmode="decimal" ${attr(l.morningWeight)}`, '起床如厕后、进食前')}
     ${field('sleepStart', '入睡时间', `type="time" ${attr(l.sleepStart)}`)}
     ${field('wake', '起床时间', `type="time" ${attr(l.wake)}`)}
-    ${field('intake', '当日实际摄入 KCAL', `type="number" inputmode="numeric" ${attr(l.intake)}`, '可选，填写后会校准真实消耗')}
+    ${field('intake', '当日实际摄入 KCAL', `type="number" inputmode="numeric" ${attr(l.intake)}`, '可选，在「膳食」页记录已吃会自动同步')}
     ${field('steps', '当日步数', `type="number" inputmode="numeric" ${attr(l.steps)}`, '可选')}
+    ${field('waist', '腰围 CM', `type="number" step="0.1" inputmode="decimal" ${attr(l.waist)}`, '可选，每周量一次：肚脐水平、呼气末')}
   </form>
   <div class="actions"><button class="btn" form="log-form">保存记录</button></div>
   ${messages(ui)}`;
@@ -75,7 +76,7 @@ export function viewJournal(ctx) {
       <td>${l.date}</td><td class="num">${fmt(l.eveningWeight, 1)}</td><td class="num">${fmt(l.morningWeight, 1)}</td>
       <td class="num">${l.sleepStart ? fmt(sleepHours(l.sleepStart, l.wake), 1) : '—'}</td>
       <td class="num">${rate != null ? Math.round((l.eveningWeight - l.morningWeight) * 1000) : '—'}</td>
-      <td class="num">${fmt(rate)}</td><td class="num">${fmt(l.intake)}</td><td class="num">${fmt(l.steps)}</td>
+      <td class="num">${fmt(rate)}</td><td class="num">${fmt(l.intake)}</td><td class="num">${fmt(l.steps)}</td><td class="num">${fmt(l.waist, 1)}</td>
       <td class="num"><button class="btn link" data-action="edit-log" data-date="${l.date}">编辑</button>
         <button class="btn link" data-action="delete-log" data-date="${l.date}">删除</button></td></tr>`;
   }).join('');
@@ -84,7 +85,7 @@ export function viewJournal(ctx) {
     <p class="lede">一天一次：睡前称重、晨起空腹称重、记下睡眠时间。每次保存都会重新计算你的基础代谢与方案。</p>
     ${logForm(ctx)}
     <div class="section table-wrap">${rows ? `<table>
-      <thead><tr><th>日期</th><th class="num">睡前</th><th class="num">晨起</th><th class="num">睡眠 H</th><th class="num">掉秤 G</th><th class="num">G/H</th><th class="num">摄入</th><th class="num">步数</th><th></th></tr></thead>
+      <thead><tr><th>日期</th><th class="num">睡前</th><th class="num">晨起</th><th class="num">睡眠 H</th><th class="num">掉秤 G</th><th class="num">G/H</th><th class="num">摄入</th><th class="num">步数</th><th class="num">腰围</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table>` : '<div class="empty">暂无记录</div>'}</div>`;
 }
 
@@ -106,6 +107,10 @@ export function viewProgress({ state, d }) {
     <div class="section">${weightChart(state.logs, state.profile.target, d.plan.weeklyLossKg)}
       <div class="legend"><span><i></i>7 日均线</span><span><i style="border-top:2px dotted var(--muted)"></i>每日晨重</span>
         <span><i style="border-top:2px dashed var(--sage)"></i>方案预测</span><span><i style="border-top:2px dotted var(--gold)"></i>目标</span></div></div>
+    <div class="section"><div class="eyebrow">Waist</div><h2>腰围</h2>
+      ${waistChart(state.logs)}
+      ${d.analysis.waist != null ? `<p class="muted small">近 3 周 ${d.analysis.waist > 0 ? '+' : ''}${d.analysis.waist} cm · 体重平台期时，腰围比体重更能反映脂肪变化。</p>` : ''}
+    </div>
     <div class="grid-2 section">
       ${stageCard(d.analysis, '当前阶段')}
       <div><div class="eyebrow">Overnight</div><h2>睡眠掉秤</h2>${nightChart(state.logs, d.meta.night.baseline)}</div>

@@ -8,9 +8,9 @@
   --sage: #3e5446;
   --sage-soft: #e6ebe5;
   --rose: #9a4a3e;
-  --serif: 'Cormorant Garamond', 'Noto Serif SC', serif;
-  --serif-cn: 'Noto Serif SC', 'Cormorant Garamond', serif;
-  --sans: 'Jost', 'Noto Sans SC', -apple-system, sans-serif;
+  --serif: 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+  --serif-cn: 'Noto Serif SC', 'Cormorant Garamond', 'Songti SC', 'STSong', serif;
+  --sans: 'Jost', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', -apple-system, sans-serif;
 }
 
 * { box-sizing: border-box; }

@@ -5,7 +5,7 @@ import { FOODS } from './data.js';
 import { foodPool, remainingMeals } from './menu.js';
 import {
   loadState, saveState, validateProfile, validateLog, validateState, validateSettings, validateFood, validateEatenMeal,
-  upsertLog, sampleState, todayISO, EMPTY_STATE,
+  upsertLog, syncIntake, sampleState, todayISO, EMPTY_STATE,
 } from './store.js';
 import { viewToday, viewJournal, viewProgress, viewProfile } from './views/core.js';
 import { viewPlan } from './views/plan.js';
@@ -88,13 +88,14 @@ function recordMeal(key, raw) {
   if (error) return setUi({ ...CLEAR_MSG, error });
   const today = todayISO();
   const day = { ...(state.eaten[today] ?? {}), [key]: value };
-  setState({ ...state, eaten: { ...state.eaten, [today]: day } }, { ...CLEAR_MSG, flash: `已记录 ${value.kcal} kcal，剩余餐次已重新推荐` });
+  const next = syncIntake({ ...state, eaten: { ...state.eaten, [today]: day } }, today);
+  setState(next, { ...CLEAR_MSG, flash: `已记录 ${value.kcal} kcal，已同步到今日摄入，剩余餐次已重新推荐` });
 }
 
 function unrecordMeal(key) {
   const today = todayISO();
   const { [key]: _removed, ...rest } = state.eaten[today] ?? {};
-  setState({ ...state, eaten: { ...state.eaten, [today]: rest } }, CLEAR_MSG);
+  setState(syncIntake({ ...state, eaten: { ...state.eaten, [today]: rest } }, today), CLEAR_MSG);
 }
 
 function eatSelected(key) {
@@ -206,3 +207,7 @@ async function importFile(file) {
 }
 
 render();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((err) => console.error('[leger] 离线缓存注册失败', err));
+}

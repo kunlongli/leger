@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { plan, mealTargets, metabolism, DEFAULT_SETTINGS } from './calc.js';
 import { FOODS } from './data.js';
 import { excludedIds, foodPool, remainingMeals, composeMenus, candidates, recommend, MIN_MEAL_KCAL } from './menu.js';
-import { validateSettings, validateFood, validateEatenMeal, validateState } from './store.js';
+import { validateSettings, validateFood, validateEatenMeal, validateState, validateLog, syncIntake, EMPTY_STATE } from './store.js';
+import { waistChange, analyze } from './advice.js';
 import { esc } from './ui.js';
 
 const byId = (id) => FOODS.find((f) => f.id === id);
@@ -90,5 +91,40 @@ assert.deepEqual(migrated.settings, DEFAULT_SETTINGS);
 assert.deepEqual(migrated.prefs, { groups: [], exclude: [], pantry: [] });
 assert.deepEqual(validateState({ logs: [], prefs: { groups: ['seafood', 'bogus'], pantry: ['chicken', '<x>'] } }).value.prefs,
   { groups: ['seafood'], exclude: [], pantry: ['chicken'] });
+
+// ---------- 已吃 → 当日摄入 ----------
+const D = '2026-10-16';
+const withLog = { ...EMPTY_STATE, logs: [{ date: D, morningWeight: 80, eveningWeight: null, sleepStart: null, wake: null, intake: 2500, steps: null, waist: null }] };
+const synced = syncIntake({ ...withLog, eaten: { [D]: { breakfast: { kcal: 500, protein: 30, name: 'a' }, lunch: { kcal: 700, protein: 40, name: 'b' } } } }, D);
+assert.equal(synced.logs[0].intake, 1200, '覆盖为已吃合计');
+assert.equal(synced.logs[0].morningWeight, 80, '其他字段保留');
+const fresh = syncIntake({ ...EMPTY_STATE, eaten: { [D]: { lunch: { kcal: 600, protein: 30, name: 'x' } } } }, D);
+assert.deepEqual([fresh.logs.length, fresh.logs[0].intake, fresh.logs[0].morningWeight], [1, 600, null], '当天没有记录时新建');
+assert.equal(syncIntake({ ...fresh, eaten: { [D]: {} } }, D).logs.length, 0, '全部撤销后删除只剩摄入的记录');
+assert.equal(syncIntake({ ...withLog, eaten: { [D]: {} } }, D).logs[0].intake, null, '撤销后有体重的记录保留，摄入清空');
+assert.equal(syncIntake(EMPTY_STATE, D), EMPTY_STATE, '无事发生');
+
+// ---------- 腰围 ----------
+assert.ok(validateLog({ date: D, waist: '85.5' }).value.waist === 85.5, '只填腰围也可保存');
+assert.ok(validateLog({ date: D, waist: '20' }).error.includes('腰围'));
+assert.ok(validateLog({ date: D }).error.includes('至少填写'));
+const wlog = (date, waist, w) => ({ date, waist, morningWeight: w });
+assert.equal(waistChange([wlog('2026-10-01', 90, 80), wlog('2026-10-03', 89, 80)]), null, '间隔不足 7 天');
+assert.equal(waistChange([wlog('2026-09-01', 95, 80), wlog('2026-10-01', 90, 80), wlog('2026-10-15', 88.5, 80)]), -1.5, '只看近 3 周');
+// 平台期 + 腰围下降 → 首条建议说明脂肪仍在减
+const plateauLogs = Array.from({ length: 20 }, (_, i) => ({ date: new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10), morningWeight: 80, waist: i % 7 === 0 ? 90 - i * 0.1 : null }));
+const pa = analyze(profile, plateauLogs, metabolism(profile, plateauLogs));
+assert.equal(pa.stage.key, 'plateau');
+assert.ok(pa.tips[0].includes('腰围减少'), pa.tips[0]);
+
+// ---------- 离线缓存清单 ----------
+const { readFileSync, readdirSync } = await import('node:fs');
+const swText = readFileSync(new URL('./sw.js', import.meta.url), 'utf8');
+const core = JSON.parse(swText.match(/const CORE = (\[[\s\S]*?\]);/)[1].replace(/'/g, '"').replace(/,\s*\]/, ']'));
+const modules = [
+  ...readdirSync(new URL('./', import.meta.url)).filter((f) => f.endsWith('.js') && f !== 'sw.js'),
+  ...readdirSync(new URL('./views/', import.meta.url)).map((f) => `views/${f}`),
+];
+assert.deepEqual(modules.filter((m) => !core.includes(m)), [], 'sw.js CORE 漏了模块');
 
 console.log('all menu checks passed');
